@@ -93,11 +93,13 @@ router.delete('/users/:id', (req, res) => {
 
 // 사용자 추가
 router.post('/users', (req, res) => {
-  const name = req.body.name || '';
+  // validation 필요할 수도
+  const userName = req.body.user_name || '';
+  const velogName = req.body.velog_name || '';
+  const socialInfo = req.body.social_info || '';
+  const emailAddr = req.body.email_addr || '';
+  const emailInfo = req.body.email_info || '';
 
-  if (name.length === 0) {
-    return res.status(400).json({ err: 'Incorrect name!' });
-  }
   const newId =
     temp.reduce((maxId, user) => {
       return user.user_id > maxId ? user.user_id : maxId;
@@ -106,12 +108,46 @@ router.post('/users', (req, res) => {
   // 새로운 유저 정의
   const newUser = {
     user_id: newId,
-    user_name: name,
-    velog_name: '',
+    user_name: userName,
+    velog_name: velogName,
+    social_info: socialInfo,
+    email_addr: emailAddr,
+    email_info: emailInfo,
   };
   temp.push(newUser);
 
   return res.status(201).json(newUser);
+});
+
+// 사용자 정보 업데이트
+router.put('/users/:id', (req, res) => {
+  // id가 Nullish 값인 경우
+  const id = parseInt(req.params.id, 10);
+  if (!id) {
+    return res.status(400).json({ err: 'Incorrect id!' });
+  }
+
+  // id에 해당하는 사용자가 없는 경우
+  const idx = temp.findIndex(user => user.user_id === id);
+  if (idx === -1) {
+    return res.status(404).json({ err: 'Unknown user' });
+  }
+  const target = temp[idx];
+
+  const userName = req.body.user_name || '';
+  const velogName = req.body.velog_name || '';
+  const socialInfo = req.body.social_info || '';
+  const emailAddr = req.body.email_addr || '';
+  const emailInfo = req.body.email_info || '';
+
+  // 유저 정보 변경
+  target.user_name = userName;
+  target.velog_name = velogName;
+  target.social_info = socialInfo;
+  target.email_addr = emailAddr;
+  target.email_info = emailInfo;
+
+  return res.status(201).json(target);
 });
 
 export default router;
