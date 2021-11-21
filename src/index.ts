@@ -1,6 +1,7 @@
 // Server.ts
 import express from 'express';
 import userApi from './router/userApi';
+import postApi from './router/postApi';
 import cors from 'cors';
 
 class Server {
@@ -20,6 +21,7 @@ const server = new Server().app;
 server.set('port', 3000); // 포트지정 바로 listen으로 지정해도 상관없음
 server.use(express.urlencoded({ extended: true }));
 server.use(userApi);
+server.use(postApi);
 server.use(cors()); //모든 cross-origin 요청에 대해 응답
 
 server
