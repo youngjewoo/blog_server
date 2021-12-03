@@ -66,7 +66,7 @@ router.post('/users', (req, response) => {
     // 새로운 user id 발급
     const newId =
       users.reduce((maxId, user) => {
-        return user.user_id > maxId ? user.user_id : maxId;
+        return Number(user.user_id) > maxId ? Number(user.user_id) : maxId;
       }, 1) + 1;
 
     // column name 스트링 생성 (req.body에 대한 validation 필요할 수도)
