@@ -1,5 +1,7 @@
+import { create } from 'domain';
 import express from 'express';
 import dbConn from '../db/dbConn';
+import { createUrlSlug, genSubSlug } from '../utils/slugUtil';
 
 const router = express.Router();
 
@@ -40,11 +42,35 @@ router.get('/@:username', (req, response) => {
   );
 });
 
-// 사용자의 특정 포스팅 GET
-router.get('/@:username/:title', (req, response) => {
+// 사용자의 특정 포스팅 GET (by title)
+// router.get('/@:username/:title', (req, response) => {
+//   const userName = req.params.username;
+//   const title = req.params.title;
+//   console.log(title);
+
+//   // 사용자 이름이 넘어오지 않은 경우
+//   if (userName === undefined || userName === '') {
+//     return response.status(201).json(`Unkown user ${userName}`);
+//   }
+
+//   // 사용자 이름과 일치하는 포스팅 데이터
+//   dbConn.query(
+//     `SELECT * FROM public."BLOG_POSTS"
+//     JOIN public."BLOG_USERS"
+//     ON public."BLOG_USERS".user_id = public."BLOG_POSTS".fk_user_id
+//     WHERE (velog_name='${userName}' AND title='${title}')`,
+//     (err, result) => {
+//       const users = result.rows;
+//       response.status(200).json(users);
+//     }
+//   );
+// });
+
+// 사용자의 특정 포스팅 GET (by slug)
+router.get('/@:username/:url_slug', (req, response) => {
   const userName = req.params.username;
-  const title = req.params.title;
-  console.log(title);
+  const slug = req.params.url_slug;
+  console.log(slug);
 
   // 사용자 이름이 넘어오지 않은 경우
   if (userName === undefined || userName === '') {
@@ -56,7 +82,7 @@ router.get('/@:username/:title', (req, response) => {
     `SELECT * FROM public."BLOG_POSTS"
     JOIN public."BLOG_USERS"
     ON public."BLOG_USERS".user_id = public."BLOG_POSTS".fk_user_id
-    WHERE (velog_name='${userName}' AND title='${title}')`,
+    WHERE (velog_name='${userName}' AND url_slug='${slug}')`,
     (err, result) => {
       const users = result.rows;
       response.status(200).json(users);
@@ -64,8 +90,9 @@ router.get('/@:username/:title', (req, response) => {
   );
 });
 
-// 사용자 포스팅 UPDATE
+// 사용자 포스팅 CREATE
 router.post('/write', (req, response) => {
+  req.body.url_slug = createUrlSlug(req.body.title);
   dbConn.query('SELECT * FROM public."BLOG_POSTS"', (err, result) => {
     const posts = result.rows;
 
@@ -75,6 +102,11 @@ router.post('/write', (req, response) => {
         return Number(post.id) > maxId ? Number(post.id) : maxId;
       }, 0) + 1;
 
+    // Slug의 중복 여부 체크
+    if (posts.some(post => post.url_slug === req.body.url_slug)) {
+      req.body.url_slug = `${req.body.url_slug}-${genSubSlug()}`;
+    }
+    console.log(req.body.url_slug);
     // column name 스트링 생성 (req.body에 대한 validation 필요할 수도)
     const targetColStr = ['id', ...Object.getOwnPropertyNames(req.body), 'released_at']
       .filter(prop => prop !== '')
@@ -93,7 +125,6 @@ router.post('/write', (req, response) => {
     const insertQuery = `INSERT INTO public."BLOG_POSTS" (${targetColStr}) 
       VALUES (${newPostInfoStr}) 
       returning id;`;
-    console.log(insertQuery);
 
     dbConn.query(insertQuery, (err, result) => {
       if (err) {
