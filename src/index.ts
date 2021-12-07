@@ -2,6 +2,7 @@
 import express from 'express';
 import userApi from './router/userApi';
 import postApi from './router/postApi';
+import imgApi from './router/imgApi';
 import cors from 'cors';
 
 class Server {
@@ -22,6 +23,7 @@ server.set('port', 3000); // 포트지정 바로 listen으로 지정해도 상�
 server.use(express.urlencoded({ extended: true }));
 server.use(userApi);
 server.use(postApi);
+server.use(imgApi);
 server.use(cors()); //모든 cross-origin 요청에 대해 응답
 
 server
