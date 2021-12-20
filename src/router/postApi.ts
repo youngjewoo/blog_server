@@ -19,6 +19,26 @@ router.get('/posts', (req, response) => {
   );
 });
 
+router.get('/recentPosts/:loadPostCount', async (req, response) => {
+  const { loadPostCount } = req.params;
+  const postsQueryResult = await dbConn.query(`SELECT * FROM public."BLOG_POSTS"
+  JOIN public."BLOG_USERS" 
+  ON public."BLOG_USERS".user_id = public."BLOG_POSTS".fk_user_id
+  ORDER BY released_at DESC LIMIT 15 OFFSET ${+loadPostCount * 15};`);
+
+  const posts = postsQueryResult.rows;
+  const postsWithUser = posts.map((post) => {
+    return post = {
+      ...post,
+      user: {
+        id: post.user_id,
+        username: post.user_name,
+      }
+    }
+  });
+  return response.json(postsWithUser);
+});
+
 // 사용자 포스팅 모두 GET
 router.get('/@:username', (req, response) => {
   const userName = req.params.username;
