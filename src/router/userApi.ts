@@ -14,7 +14,7 @@ router.get('/users', (req, response) => {
 // id에 해당하는 사용자 리턴
 router.get('/users/:id', (req, response) => {
   // id가 Nullish 값인 경우
-  const id = parseInt(req.params.id, 10);
+  const id = req.params.id;
   if (!id) {
     return response.status(400).json({ err: 'Incorrect id!' });
   }
