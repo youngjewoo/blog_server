@@ -4,6 +4,7 @@ import userApi from './router/userApi';
 import postApi from './router/postApi';
 import loginApi from './router/loginApi';
 import cors from 'cors';
+import dbConn from './db/dbConn';
 
 class Server {
   // app 타입 지정
@@ -34,3 +35,5 @@ server
   .on('error', err => {
     console.log(`Error message ${err}`);
   });
+
+dbConn.connect();
