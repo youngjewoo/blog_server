@@ -3,6 +3,7 @@ import express from 'express';
 import userApi from './router/userApi';
 import postApi from './router/postApi';
 import loginApi from './router/loginApi';
+import imgApi from './router/imgApi';
 import cors from 'cors';
 import dbConn from './db/dbConn';
 
@@ -27,6 +28,7 @@ server.use(cors()); //모든 cross-origin 요청에 대해 응답
 server.use(userApi);
 server.use(postApi);
 server.use(loginApi);
+server.use(imgApi);
 
 server
   .listen(server.get('port'), () => {
