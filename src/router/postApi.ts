@@ -1,4 +1,3 @@
-import { create } from 'domain';
 import express from 'express';
 import dbConn from '../db/dbConn';
 import { createUrlSlug, genSubSlug } from '../utils/slugUtil';
