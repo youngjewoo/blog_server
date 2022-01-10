@@ -8,6 +8,4 @@ const dbConn = new Client({
   port: 5432,
 });
 
-dbConn.connect();
-
 export default dbConn;

@@ -1,9 +1,8 @@
-// Server.ts
+// test_server.ts
 import express from 'express';
 import userApi from './router/userApi';
 import postApi from './router/postApi';
 import loginApi from './router/loginApi';
-import imgApi from './router/imgApi';
 import cors from 'cors';
 import dbConn from './db/dbConn';
 
@@ -21,21 +20,12 @@ class Server {
 }
 
 const server = new Server().app;
-server.set('port', 3000); // 포트지정 바로 listen으로 지정해도 상관없음
+server.set('port', 8888); // 테스트용 포트
 server.use(express.json());
 server.use(express.urlencoded({ extended: true }));
 server.use(cors()); //모든 cross-origin 요청에 대해 응답
 server.use(userApi);
 server.use(postApi);
 server.use(loginApi);
-server.use(imgApi);
 
-server
-  .listen(server.get('port'), () => {
-    console.log(`${server.get('port')} server is Running`);
-  })
-  .on('error', err => {
-    console.log(`Error message ${err}`);
-  });
-
-dbConn.connect();
+export default server;
