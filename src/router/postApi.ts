@@ -1,4 +1,3 @@
-import { create } from 'domain';
 import express from 'express';
 import dbConn from '../db/dbConn';
 import { createUrlSlug, genSubSlug } from '../utils/slugUtil';
@@ -104,8 +103,11 @@ router.get('/@:username/:url_slug', (req, response) => {
     ON public."BLOG_USERS".user_id = public."BLOG_POSTS".fk_user_id
     WHERE (velog_name='${userName}' AND url_slug='${slug}')`,
     (err, result) => {
-      const users = result.rows;
-      response.status(200).json(users);
+      if (result.rows.length === 0) {
+        return response.status(404).json({ err: 'Post Not Found' });
+      }
+      const post = result.rows[0];
+      return response.status(200).json(post);
     }
   );
 });
