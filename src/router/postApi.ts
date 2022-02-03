@@ -107,6 +107,11 @@ router.get('/@:username/:url_slug', (req, response) => {
         return response.status(404).json({ err: 'Post Not Found' });
       }
       const post = result.rows[0];
+      response.setHeader('Cache-Control', 'private, no-cache');
+      if (req.headers['if-modified-since'] === new Date(post.released_at).toUTCString()) {
+        return response.status(304).send();
+      }
+      response.setHeader('Last-Modified', new Date(post.released_at).toUTCString());
       return response.status(200).json(post);
     }
   );
