@@ -1,4 +1,5 @@
 import express from 'express';
+import { v4 } from 'uuid';
 import dbConn from '../db/dbConn';
 import { createUrlSlug, genSubSlug } from '../utils/slugUtil';
 
@@ -7,33 +8,28 @@ const router = express.Router();
 // 사용자 목록
 router.get('/posts', (req, response) => {
   // 테이블 이름에 "" 반드시 붙여줘야함..
-  dbConn.query(
-    `SELECT * FROM public."BLOG_POSTS"
-  JOIN public."BLOG_USERS" 
-  ON public."BLOG_USERS".user_id = public."BLOG_POSTS".fk_user_id
-  ORDER BY released_at DESC;`,
-    (err, result) => {
-      return response.json(result.rows);
-    }
-  );
+  dbConn.query(`SELECT * FROM public."BLOG_POSTS" ORDER BY released_at DESC;`, (err, result) => {
+    return response.json(result.rows);
+  });
 });
 
 router.get('/recentPosts/:loadPostCount', async (req, response) => {
   const { loadPostCount } = req.params;
-  const postsQueryResult = await dbConn.query(`SELECT * FROM public."BLOG_POSTS"
-  JOIN public."BLOG_USERS" 
-  ON public."BLOG_USERS".user_id = public."BLOG_POSTS".fk_user_id
-  ORDER BY released_at DESC LIMIT 15 OFFSET ${+loadPostCount * 15};`);
+  const postsQueryResult = await dbConn.query(
+    `SELECT * FROM public."BLOG_POSTS" ORDER BY released_at DESC LIMIT 15 OFFSET ${
+      +loadPostCount * 15
+    };`
+  );
 
   const posts = postsQueryResult.rows;
-  const postsWithUser = posts.map((post) => {
-    return post = {
+  const postsWithUser = posts.map(post => {
+    return (post = {
       ...post,
       user: {
         id: post.user_id,
         username: post.user_name,
-      }
-    }
+      },
+    });
   });
   return response.json(postsWithUser);
 });
@@ -49,10 +45,7 @@ router.get('/@:username', (req, response) => {
 
   // 사용자 이름과 일치하는 포스팅 데이터
   dbConn.query(
-    `SELECT * FROM public."BLOG_POSTS"
-    JOIN public."BLOG_USERS" 
-    ON public."BLOG_USERS".user_id = public."BLOG_POSTS".fk_user_id
-    WHERE velog_name='${userName}'
+    `SELECT * FROM public."BLOG_POSTS" WHERE fk_user_name='${userName}'
     ORDER BY released_at DESC;`,
     (err, result) => {
       const users = result.rows;
@@ -60,30 +53,6 @@ router.get('/@:username', (req, response) => {
     }
   );
 });
-
-// 사용자의 특정 포스팅 GET (by title)
-// router.get('/@:username/:title', (req, response) => {
-//   const userName = req.params.username;
-//   const title = req.params.title;
-//   console.log(title);
-
-//   // 사용자 이름이 넘어오지 않은 경우
-//   if (userName === undefined || userName === '') {
-//     return response.status(201).json(`Unkown user ${userName}`);
-//   }
-
-//   // 사용자 이름과 일치하는 포스팅 데이터
-//   dbConn.query(
-//     `SELECT * FROM public."BLOG_POSTS"
-//     JOIN public."BLOG_USERS"
-//     ON public."BLOG_USERS".user_id = public."BLOG_POSTS".fk_user_id
-//     WHERE (velog_name='${userName}' AND title='${title}')`,
-//     (err, result) => {
-//       const users = result.rows;
-//       response.status(200).json(users);
-//     }
-//   );
-// });
 
 // 사용자의 특정 포스팅 GET (by slug)
 router.get('/@:username/:url_slug', (req, response) => {
@@ -98,10 +67,7 @@ router.get('/@:username/:url_slug', (req, response) => {
 
   // 사용자 이름과 일치하는 포스팅 데이터
   dbConn.query(
-    `SELECT * FROM public."BLOG_POSTS"
-    JOIN public."BLOG_USERS"
-    ON public."BLOG_USERS".user_id = public."BLOG_POSTS".fk_user_id
-    WHERE (velog_name='${userName}' AND url_slug='${slug}')`,
+    `SELECT * FROM public."BLOG_POSTS" WHERE (fk_user_name='${userName}' AND url_slug='${slug}')`,
     (err, result) => {
       if (result.rows.length === 0) {
         return response.status(404).json({ err: 'Post Not Found' });
@@ -122,18 +88,13 @@ router.post('/write', (req, response) => {
   req.body.url_slug = createUrlSlug(req.body.title);
   dbConn.query('SELECT * FROM public."BLOG_POSTS"', (err, result) => {
     const posts = result.rows;
+    const newId = v4();
 
-    // 새로운 포스팅 id 발급 (DB 함수로 max id를 얻어올 수도 있을 거 같음 성능 비교 후 바꾸자)
-    const newId =
-      posts.reduce((maxId, post) => {
-        return Number(post.id) > maxId ? Number(post.id) : maxId;
-      }, 0) + 1;
-
-    // Slug의 중복 여부 체크
+    // Slug의 중복 여부 체크 - 같은 유저끼리만 중복 검사하자
     if (posts.some(post => post.url_slug === req.body.url_slug)) {
       req.body.url_slug = `${req.body.url_slug}-${genSubSlug()}`;
     }
-    console.log(req.body.url_slug);
+
     // column name 스트링 생성 (req.body에 대한 validation 필요할 수도)
     const targetColStr = ['id', ...Object.getOwnPropertyNames(req.body), 'released_at']
       .filter(prop => prop !== '')
