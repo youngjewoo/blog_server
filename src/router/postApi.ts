@@ -26,7 +26,7 @@ router.get('/recentPosts/:loadPostCount', async (req, response) => {
     return (post = {
       ...post,
       user: {
-        id: post.user_id,
+        // id: post.user_id, // user_id는 삭제됐습니다 ㅠ
         username: post.user_name,
       },
     });
