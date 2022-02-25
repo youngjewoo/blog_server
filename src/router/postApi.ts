@@ -1,9 +1,99 @@
 import express from 'express';
-import { v4 } from 'uuid';
+import { v4, validate } from 'uuid';
 import dbConn from '../db/dbConn';
+import { SinglePost } from '../types/Post';
+import { User } from '../types/User';
 import { createUrlSlug, genSubSlug } from '../utils/slugUtil';
 
 const router = express.Router();
+const getDBColName = (propName: string) => {
+  switch (propName) {
+    case 'id': // uuid
+    case 'title': // text
+    case 'body':
+    case 'short_description':
+    case 'thumbnail':
+    case 'temp_post_id':
+    case 'url_slug':
+    case 'is_markdown': // boolean
+    case 'is_temp':
+    case 'is_private':
+    case 'released_at': // timestamp
+    case 'likes': // integer
+    case 'views':
+      return propName;
+    case 'user': // json
+      return 'fk_user_name';
+    default:
+      return '';
+  }
+};
+
+const getDBTypeString = (propName: string) => {
+  let typeString = '';
+  switch (propName) {
+    case 'id': // uuid
+      typeString = 'uuid';
+      break;
+    case 'title': // text
+    case 'body':
+    case 'short_description':
+    case 'thumbnail':
+    case 'temp_post_id':
+    case 'url_slug':
+      typeString = 'text';
+      break;
+    case 'is_markdown': // boolean
+    case 'is_temp':
+    case 'is_private':
+      typeString = 'boolean';
+      break;
+    case 'released_at': // timestamp
+      typeString = 'timestamp with time zone';
+      break;
+    case 'likes': // integer
+    case 'views':
+      typeString = 'integer';
+      break;
+    case 'user': // json
+      typeString = 'text';
+    default:
+      break;
+  }
+  return typeString;
+};
+const getDBValueString = (propName: string, propVal: string | number | boolean | User) => {
+  let valueString = '';
+  switch (propName) {
+    case 'id': // uuid
+    case 'title': // text
+    case 'body':
+    case 'short_description':
+    case 'thumbnail':
+    case 'temp_post_id':
+    case 'url_slug':
+      valueString = propVal as string;
+      break;
+    case 'released_at': // timestamp
+      valueString = new Date().toISOString();
+      break;
+    case 'is_markdown': // boolean
+    case 'is_temp':
+    case 'is_private':
+      valueString = (propVal as boolean) ? 'true' : 'false';
+      break;
+    case 'likes': // integer
+    case 'views':
+      valueString = (propVal as number).toString();
+      break;
+    case 'user': // json
+      valueString = (propVal as User).username;
+      break;
+    default:
+      return '';
+  }
+  return `'${valueString}'::${getDBTypeString(propName)}`;
+};
 
 // 사용자 목록
 router.get('/posts', (req, response) => {
@@ -83,43 +173,145 @@ router.get('/@:username/:url_slug', (req, response) => {
   );
 });
 
-// 사용자 포스팅 CREATE
-router.post('/write', (req, response) => {
-  req.body.url_slug = createUrlSlug(req.body.title);
-  dbConn.query('SELECT * FROM public."BLOG_POSTS"', (err, result) => {
-    const posts = result.rows;
-    const newId = v4();
+const createPostQuery = async (postInfo: SinglePost) => {
+  let newSlug = createUrlSlug(postInfo.title);
+  console.log(postInfo);
+  const userName = postInfo.user.username;
+  const result = await dbConn.query(
+    `SELECT * FROM public."BLOG_POSTS" WHERE (fk_user_name='${userName}' AND url_slug='${newSlug}')`
+  );
 
-    // Slug의 중복 여부 체크 - 같은 유저끼리만 중복 검사하자
-    if (posts.some(post => post.url_slug === req.body.url_slug)) {
-      req.body.url_slug = `${req.body.url_slug}-${genSubSlug()}`;
-    }
+  if (result.rows.length > 0) {
+    newSlug = `${newSlug}-${genSubSlug()}`;
+  }
+  // column name 스트링 생성 (validation 필요할 수도)
+  const targetColStr = ['id', ...Object.getOwnPropertyNames(postInfo), 'released_at']
+    .filter(prop => prop !== '')
+    .map(colName => (colName === 'user' ? 'fk_user_name' : colName))
+    .join(',');
 
-    // column name 스트링 생성 (req.body에 대한 validation 필요할 수도)
-    const targetColStr = ['id', ...Object.getOwnPropertyNames(req.body), 'released_at']
+  // column value 스트링 생성
+  const newPostInfoStr = [
+    `'${v4()}'`,
+    ...Object.values(postInfo).map(val => {
+      if (typeof val === 'object') {
+        return `'${val.username}'`;
+      } else {
+        return `'${val}'`;
+      }
+    }),
+    `'${new Date().toISOString()}'`,
+  ]
+    .filter(prop => prop !== '')
+    .join(',');
+
+  // 새로운 포스팅 생성 쿼리
+  const insertQuery = `INSERT INTO public."BLOG_POSTS" (${targetColStr}) 
+      VALUES (${newPostInfoStr}) 
+      returning id;`;
+
+  return insertQuery;
+};
+
+const updatePostQuery = async (postInfo: SinglePost) => {
+  const userName = postInfo.user.username;
+  const postId = postInfo.id;
+  const result = await dbConn.query(
+    `SELECT * FROM public."BLOG_POSTS" WHERE (fk_user_name='${userName}' AND id='${postId}')`
+  );
+
+  const postData = result.rows[0];
+  if (postData.length === 0) {
+    return '';
+  }
+  const valueAsignStr = [...Object.getOwnPropertyNames(postInfo), 'released_at']
+    .filter((propName: string) => postInfo[propName])
+    .map(
+      propName => `${getDBColName(propName)} = ${getDBValueString(propName, postInfo[propName])}`
+    )
+    .join(',');
+
+  return `UPDATE public."BLOG_POSTS" SET ${valueAsignStr} WHERE id = '${postData.id}'`;
+};
+
+const tempSaveQuery = async (postInfo: SinglePost) => {
+  const postId = postInfo.id;
+  const result = await dbConn.query(`SELECT * FROM public."BLOG_POSTS" WHERE id='${postId}'`);
+  const postData = result.rows[0];
+  let dbQuery = '';
+  if (postData.length === 0) {
+    return '';
+  }
+
+  if (postData.temp_post_id) {
+    const valueAsignStr = [...Object.getOwnPropertyNames(postInfo), 'released_at']
+      .filter((propName: string) => postInfo[propName])
+      .map(propName => `${propName} = ${getDBValueString(propName, postInfo[propName])}`)
+      .join(',');
+
+    dbQuery = `UPDATE public."BLOG_POSTS" SET ${valueAsignStr} WHERE id = '${postData.temp_post_id}'`;
+  } else {
+    // column name 스트링 생성 (validation 필요할 수도)
+    const targetColStr = [...Object.getOwnPropertyNames(postInfo), 'released_at']
       .filter(prop => prop !== '')
+      .map(colName => (colName === 'user' ? 'fk_user_name' : colName))
       .join(',');
 
     // column value 스트링 생성
     const newPostInfoStr = [
-      newId,
-      ...Object.values(req.body).map(val => `'${val}'`),
+      v4(),
+      ...Object.values(postInfo).map(val => `'${val}'`),
       `'${new Date().toISOString()}'`,
     ]
       .filter(prop => prop !== '')
       .join(',');
 
     // 새로운 포스팅 생성 쿼리
-    const insertQuery = `INSERT INTO public."BLOG_POSTS" (${targetColStr}) 
-      VALUES (${newPostInfoStr}) 
-      returning id;`;
+    dbQuery = `INSERT INTO public."TEMP_POSTS" (${targetColStr}) 
+    VALUES (${newPostInfoStr}) 
+    returning id;`;
+  }
 
-    dbConn.query(insertQuery, (err, result) => {
-      if (err) {
-        response.status(400).json(err);
+  return dbQuery;
+};
+
+// write page 요청
+router.post('/write', async (req, response) => {
+  const { command, post } = req.body;
+  let query = '';
+  let successMessage = '';
+
+  switch (command) {
+    case 'temp_save':
+      {
+        query = await tempSaveQuery(post);
+        successMessage = `Post ${post.id} saved temporarly`;
       }
-      return response.status(201).json(`Post ${newId} created`);
-    });
+      break;
+    case 'new_post':
+      {
+        query = await createPostQuery(post);
+        successMessage = `Post ${post.id} created`;
+      }
+      break;
+    case 'edit_post':
+      {
+        query = await updatePostQuery(post);
+        successMessage = `Post ${post.id} updated`;
+      }
+      break;
+    default:
+      response.status(400).json('"Command" should be defined');
+      return;
+  }
+
+  dbConn.query(query, (err, result) => {
+    if (err) {
+      console.log(query);
+      console.log(err.message);
+      return response.status(400).json(err);
+    }
+    return response.status(201).json(successMessage);
   });
 });
 
