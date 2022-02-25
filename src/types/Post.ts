@@ -86,6 +86,7 @@ export interface LinkedPost {
 }
 
 export interface SinglePost {
+  [key: string]: any; // index signature
   id: string;
   title: string;
   released_at: string;
@@ -95,7 +96,7 @@ export interface SinglePost {
   short_description: string;
   is_markdown: boolean;
   is_private: boolean;
-  is_temp: boolean;
+  temp_post_id: string;
   thumbnail: string | null;
   url_slug: string;
   user: {
