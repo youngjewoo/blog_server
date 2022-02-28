@@ -249,7 +249,7 @@ const tempSaveQuery = async (postInfo: SinglePost) => {
       .map(propName => `${propName} = ${getDBValueString(propName, postInfo[propName])}`)
       .join(',');
 
-    dbQuery = `UPDATE public."BLOG_POSTS" SET ${valueAsignStr} WHERE id = '${postData.temp_post_id}'`;
+    dbQuery = `UPDATE public."TEMP_POSTS" SET ${valueAsignStr} WHERE id = '${postData.temp_post_id}'`;
   } else {
     // column name 스트링 생성 (validation 필요할 수도)
     const targetColStr = [...Object.getOwnPropertyNames(postInfo), 'released_at']
