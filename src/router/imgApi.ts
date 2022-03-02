@@ -66,11 +66,11 @@ router.post('/images/:username/post/:imageid/:filename', upload.single('img'), (
       }
 
       // 새로운 이미지 생성 쿼리
-      const tableCols = ['id', 'fk_post_id', 'fk_user_id', 'path', 'file_size'];
+      const tableCols = ['id', 'fk_post_id', 'fk_user_name', 'path', 'file_size'];
       const tableVals = [
         `'${req.params.imageid}'`,
         `'${req.body.post_id}'`,
-        `'${users[0].user_id}'`,
+        `'${users[0].user_name}'`,
         `'${postImgDir}/${req.file.filename}'`,
         `${req.file.size}`,
       ];
