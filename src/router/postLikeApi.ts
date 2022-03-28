@@ -16,7 +16,7 @@ router.get('/readingList/:userName/liked/', async (req, response) => {
 router.get('/readingList/:userName/liked/:loadPostCount', async (req, response) => {
   const { userName, loadPostCount } = req.params;
   const result = await dbConn.query(
-    `SELECT * FROM public."POST_LIKES" WHERE fk_user_id='${userName}' ORDER BY updated_at DESC LIMIT 16 OFFSET ${
+    `SELECT * FROM public."POST_LIKES" as p JOIN public."BLOG_POSTS" as b ON p.fk_post_id = b.id WHERE p.fk_user_id='${userName}' ORDER BY updated_at DESC LIMIT 16 OFFSET ${
       +loadPostCount * 15
     };`
   );
@@ -57,6 +57,8 @@ router.post('/:userName/like/:postId', async (req, response) => {
     `INSERT INTO public."POST_LIKES" (created_at, updated_at, fk_post_id, fk_user_id) VALUES (current_timestamp, current_timestamp, '${postId}', '${userName}'); `
   );
 
+  await syncPostCount(postId);
+
   return response.status(201).json(`${userName} liked ${postId}`);
 });
 
@@ -78,7 +80,23 @@ router.post('/:userName/unlike/:postId', async (req, response) => {
     `DELETE FROM public."POST_LIKES" WHERE fk_user_id='${userName}' AND fk_post_id='${postId}'`
   );
 
+  await syncPostCount(postId);
+
   return response.status(202).json(`${userName} unliked ${postId}`);
 });
+
+const syncPostCount = async (postId: string) => {
+  const countResult = await dbConn.query(
+    `SELECT COUNT(*) FROM public."POST_LIKES" WHERE fk_post_id='${postId}';`
+  );
+
+  try {
+    await dbConn.query(
+      `UPDATE public."BLOG_POSTS" SET likes='${countResult.rows[0].count}' WHERE id='${postId}';`
+    );
+  } catch (e) {
+    return e;
+  }
+};
 
 export default router;
