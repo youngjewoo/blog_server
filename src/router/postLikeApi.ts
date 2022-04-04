@@ -3,7 +3,7 @@ import dbConn from '../db/dbConn';
 
 const router = express.Router();
 
-router.get('/readingList/:userName/liked/', async (req, response) => {
+router.get('/:userName/readingList/liked/', async (req, response) => {
   const { userName } = req.params;
   const result = await dbConn.query(
     `SELECT * FROM public."POST_LIKES" WHERE fk_user_id='${userName}' ORDER BY updated_at DESC;`
@@ -13,7 +13,7 @@ router.get('/readingList/:userName/liked/', async (req, response) => {
   return response.status(200).json(likedPost);
 });
 
-router.get('/readingList/:userName/liked/:loadPostCount', async (req, response) => {
+router.get('/:userName/readingList/liked/:loadPostCount', async (req, response) => {
   const { userName, loadPostCount } = req.params;
   const result = await dbConn.query(
     `SELECT * FROM public."POST_LIKES" as p JOIN public."BLOG_POSTS" as b ON p.fk_post_id = b.id WHERE p.fk_user_id='${userName}' ORDER BY updated_at DESC LIMIT 16 OFFSET ${
