@@ -96,32 +96,42 @@ const getDBValueString = (propName: string, propVal: string | number | boolean |
 };
 
 // 사용자 목록
+// type: Post
 router.get('/posts', (req, response) => {
   // 테이블 이름에 "" 반드시 붙여줘야함..
-  dbConn.query(`SELECT * FROM public."BLOG_POSTS" ORDER BY released_at DESC;`, (err, result) => {
-    return response.json(result.rows);
-  });
+  dbConn.query(
+    `SELECT p.id, p.title, p.body, p.thumbnail, p.is_markdown, p.is_temp, p.url_slug, p.meta, 
+            p.is_private, p.released_at, p.likes, p.views, p.short_description,
+            json_build_object(
+              'username', u.user_name, 
+              'email', u.email_addr, 
+              'is_certified', u.is_certified) as user
+              FROM public."BLOG_POSTS" as p
+              JOIN public."BLOG_USERS" as u
+              ON p.fk_user_name = u.user_name 
+                ORDER BY released_at DESC;`,
+    (err, result) => {
+      return response.json(result.rows);
+    }
+  );
 });
 
+// type: PartialPost
 router.get('/recentPosts/:loadPostCount', async (req, response) => {
   const { loadPostCount } = req.params;
   const postsQueryResult = await dbConn.query(
-    `SELECT * FROM public."BLOG_POSTS" ORDER BY released_at DESC LIMIT 15 OFFSET ${
-      +loadPostCount * 15
-    };`
+    `SELECT p.id, p.title, p.short_description, p.thumbnail, p.url_slug, 
+            p.is_private, p.released_at, p.likes, 
+            json_build_object(
+              'username', u.user_name, 
+              'email', u.email_addr, 
+              'is_certified', u.is_certified) as user
+            FROM public."BLOG_POSTS" as p
+                JOIN public."BLOG_USERS" as u 
+                ON p.fk_user_name = u.user_name
+                  ORDER BY released_at DESC LIMIT 15 OFFSET ${+loadPostCount * 15};`
   );
-
-  const posts = postsQueryResult.rows;
-  const postsWithUser = posts.map(post => {
-    return (post = {
-      ...post,
-      user: {
-        // id: post.user_id, // user_id는 삭제됐습니다 ㅠ
-        username: post.user_name,
-      },
-    });
-  });
-  return response.json(postsWithUser);
+  return response.json(postsQueryResult.rows);
 });
 
 // 사용자 포스팅 모두 GET
