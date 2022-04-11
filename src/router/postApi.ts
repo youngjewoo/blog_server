@@ -1,3 +1,4 @@
+import etag from 'etag';
 import express from 'express';
 import { v4, validate } from 'uuid';
 import dbConn from '../db/dbConn';
@@ -164,10 +165,10 @@ router.get('/@:username/:url_slug', (req, response) => {
       }
       const post = result.rows[0];
       response.setHeader('Cache-Control', 'private, no-cache');
-      if (req.headers['if-modified-since'] === new Date(post.released_at).toUTCString()) {
+      if (req.headers['if-none-match'] === etag(post)) {
         return response.status(304).send();
       }
-      response.setHeader('Last-Modified', new Date(post.released_at).toUTCString());
+      response.setHeader('ETag', etag(post));
       return response.status(200).json(post);
     }
   );
