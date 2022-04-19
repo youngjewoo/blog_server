@@ -154,6 +154,7 @@ router.get('/@:username', (req, response) => {
   );
 });
 
+// type: SinglePost
 // 사용자의 특정 포스팅 GET (by slug)
 router.get('/@:username/:url_slug', (req, response) => {
   const userName = req.params.username;
@@ -165,9 +166,19 @@ router.get('/@:username/:url_slug', (req, response) => {
     return response.status(201).json(`Unkown user ${userName}`);
   }
 
-  // 사용자 이름과 일치하는 포스팅 데이터
+  // 사용자 이름과 일치하는 포스팅 데이터 (post <-left join- user)
   dbConn.query(
-    `SELECT * FROM public."BLOG_POSTS" WHERE (fk_user_name='${userName}' AND url_slug='${slug}')`,
+    `SELECT p.id, p.title, p.released_at, p.body, p.short_description, 
+      p.is_markdown, p.is_private, p.thumbnail, p.url_slug, 
+      json_build_object(
+        'username', u.user_name, 
+        'email', u.email_addr, 
+        'is_certified', u.is_certified) as user,
+      p.likes            
+        FROM public."BLOG_POSTS" as p
+        LEFT JOIN public."BLOG_USERS" as u
+        ON p.fk_user_name=u.user_name
+          WHERE (p.fk_user_name='${userName}' AND p.url_slug='${slug}')`,
     (err, result) => {
       if (result.rows.length === 0) {
         return response.status(404).json({ err: 'Post Not Found' });
