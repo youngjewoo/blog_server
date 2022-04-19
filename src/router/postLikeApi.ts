@@ -9,6 +9,10 @@ router.get('/:userName/readingList/liked/', async (req, response) => {
     `SELECT * FROM public."POST_LIKES" WHERE fk_user_id='${userName}' ORDER BY updated_at DESC;`
   );
 
+  if (!result) {
+    return response.status(200).json({});
+  }
+
   const likedPost = result.rows;
   return response.status(200).json(likedPost);
 });
@@ -21,6 +25,10 @@ router.get('/:userName/readingList/liked/:loadPostCount', async (req, response) 
     };`
   );
 
+  if (!result) {
+    return response.status(200).json({});
+  }
+
   const likedPost = result.rows;
   return response.status(200).json(likedPost);
 });
@@ -30,7 +38,9 @@ router.get('/:userName/liked/:postId', (req, response) => {
   dbConn.query(
     `SELECT id FROM public."POST_LIKES" WHERE fk_user_id='${userName}' AND fk_post_id='${postId}'`,
     (err, result) => {
-      console.log(result);
+      if (!result) {
+        return response.status(200).json({});
+      }
       const likedPost = result.rows;
       response.status(200).json(likedPost);
     }
