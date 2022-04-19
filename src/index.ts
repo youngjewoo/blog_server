@@ -2,6 +2,7 @@
 import express from 'express';
 import userApi from './router/userApi';
 import postApi from './router/postApi';
+import postLikeApi from './router/postLikeApi';
 import loginApi from './router/loginApi';
 import imgApi from './router/imgApi';
 import cors from 'cors';
@@ -27,9 +28,9 @@ server.use(express.urlencoded({ extended: true }));
 server.use(cors()); //모든 cross-origin 요청에 대해 응답
 server.use(userApi);
 server.use(postApi);
+server.use(postLikeApi);
 server.use(loginApi);
 server.use(imgApi);
-
 server
   .listen(server.get('port'), () => {
     console.log(`${server.get('port')} server is Running`);
