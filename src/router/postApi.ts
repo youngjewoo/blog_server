@@ -1,3 +1,4 @@
+import etag from 'etag';
 import express from 'express';
 import { v4, validate } from 'uuid';
 import dbConn from '../db/dbConn';
@@ -196,11 +197,18 @@ router.get('/@:username/:url_slug/', async (req, response) => {
     }
 
     response.setHeader('Cache-Control', 'private, no-cache');
-    if (req.headers['if-modified-since'] === new Date(post.released_at).toUTCString()) {
+    if (req.headers['if-none-match'] === etag(post)) {
       return response.status(304).send();
     }
-    response.setHeader('Last-Modified', new Date(post.released_at).toUTCString());
+    response.setHeader('ETag', etag(post));
     return response.status(200).json(post);
+
+    // response.setHeader('Cache-Control', 'private, no-cache');
+    // if (req.headers['if-modified-since'] === new Date(post.released_at).toUTCString()) {
+    //   return response.status(304).send();
+    // }
+    // response.setHeader('Last-Modified', new Date(post.released_at).toUTCString());
+    // return response.status(200).json(post);
   } catch (err) {
     return response.status(404).json({ err: 'Post Not Found' });
   }
