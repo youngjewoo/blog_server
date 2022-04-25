@@ -109,4 +109,16 @@ const syncPostCount = async (postId: string) => {
   }
 };
 
+export async function isLikedPost(loginUserName: string, postId: string) {
+  try {
+    const likedResult = await dbConn.query(
+      `SELECT id FROM public."POST_LIKES" WHERE (fk_user_id='${loginUserName}' AND fk_post_id='${postId}');`
+    );
+    return likedResult.rows.length !== 0;
+  } catch (err) {
+    console.error(err);
+    throw err;
+  }
+}
+
 export default router;
