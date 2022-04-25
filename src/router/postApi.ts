@@ -186,7 +186,7 @@ router.get('/@:username/:url_slug/', async (req, response) => {
       return response.status(404).json({ err: 'Post Not Found' });
     }
     const post = result.rows[0];
-
+    let etagHashKey = '' + post.id + post.body + post.likes;
     const loginUserName = req.query.loginUserName;
     if (loginUserName?.length && typeof loginUserName === 'string') {
       try {
@@ -194,21 +194,20 @@ router.get('/@:username/:url_slug/', async (req, response) => {
       } catch (err) {
         post.liked = false;
       }
+      etagHashKey += post.liked;
     }
 
     response.setHeader('Cache-Control', 'private, no-cache');
-    if (req.headers['if-none-match'] === etag(post)) {
+    if (
+      req.headers['if-none-match'] === etag(etagHashKey) &&
+      req.headers['if-modified-since'] === new Date(post.released_at).toUTCString()
+    ) {
       return response.status(304).send();
     }
-    response.setHeader('ETag', etag(post));
-    return response.status(200).json(post);
+    response.setHeader('ETag', etag(etagHashKey));
+    response.setHeader('Last-Modified', new Date(post.released_at).toUTCString());
 
-    // response.setHeader('Cache-Control', 'private, no-cache');
-    // if (req.headers['if-modified-since'] === new Date(post.released_at).toUTCString()) {
-    //   return response.status(304).send();
-    // }
-    // response.setHeader('Last-Modified', new Date(post.released_at).toUTCString());
-    // return response.status(200).json(post);
+    return response.status(200).json(post);
   } catch (err) {
     return response.status(404).json({ err: 'Post Not Found' });
   }

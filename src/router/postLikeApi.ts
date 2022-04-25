@@ -60,16 +60,19 @@ router.post('/:userName/like/:postId', async (req, response) => {
   );
 
   if (alreadyLiked.rowCount !== 0) {
-    return response.status(304).json(alreadyLiked);
+    return response.status(304).json(undefined);
   }
 
   const insertLiked = await dbConn.query(
     `INSERT INTO public."POST_LIKES" (created_at, updated_at, fk_post_id, fk_user_id) VALUES (current_timestamp, current_timestamp, '${postId}', '${userName}'); `
   );
 
-  await syncPostCount(postId);
+  const count = await syncPostCount(postId);
 
-  return response.status(201).json(`${userName} liked ${postId}`);
+  return response.status(201).json({
+    liked: true,
+    likes: count,
+  });
 });
 
 router.post('/:userName/unlike/:postId', async (req, response) => {
@@ -83,16 +86,19 @@ router.post('/:userName/unlike/:postId', async (req, response) => {
     `SELECT id FROM public."POST_LIKES" WHERE fk_user_id='${userName}' AND fk_post_id='${postId}'`
   );
   if (!alreadyLiked.rowCount) {
-    return response.status(204).json({ err: 'Post Not Liked' });
+    return response.status(204).json(undefined);
   }
 
   const unliked = await dbConn.query(
     `DELETE FROM public."POST_LIKES" WHERE fk_user_id='${userName}' AND fk_post_id='${postId}'`
   );
 
-  await syncPostCount(postId);
+  const count = await syncPostCount(postId);
 
-  return response.status(202).json(`${userName} unliked ${postId}`);
+  return response.status(202).json({
+    liked: false,
+    likes: count,
+  });
 });
 
 const syncPostCount = async (postId: string) => {
@@ -101,9 +107,9 @@ const syncPostCount = async (postId: string) => {
   );
 
   try {
-    await dbConn.query(
-      `UPDATE public."BLOG_POSTS" SET likes='${countResult.rows[0].count}' WHERE id='${postId}';`
-    );
+    const count = countResult.rows[0].count;
+    await dbConn.query(`UPDATE public."BLOG_POSTS" SET likes='${count}' WHERE id='${postId}';`);
+    return count;
   } catch (e) {
     return e;
   }
