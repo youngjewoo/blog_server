@@ -24,4 +24,20 @@ router.post('/login', (req, response) => {
   });
 });
 
+router.get('/login/kakao', (req, response) => {
+  return response.json(
+    `${process.env.KAKAO_AUTH_URL}?response_type=code&client_id=${process.env.KAKAO_CLIENT_ID}&redirect_uri=${process.env.KAKAO_REDIRECT_URL}`
+  );
+});
+
+router.get('/oauth/redirect', (req, response) => {
+  console.log('hi');
+  console.log(req.params);
+  console.log(req.query);
+  /**
+   * 토큰 요청 및 쿠키 생성
+   */
+  return response.redirect('http://localhost:9000');
+});
+
 export default router;

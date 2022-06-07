@@ -7,6 +7,9 @@ import loginApi from './router/loginApi';
 import imgApi from './router/imgApi';
 import cors from 'cors';
 import dbConn from './db/dbConn';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 class Server {
   // app 타입 지정
