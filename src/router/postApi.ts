@@ -1,6 +1,6 @@
 import etag from 'etag';
 import express from 'express';
-import { v4, validate } from 'uuid';
+import { v4 } from 'uuid';
 import dbConn from '../db/dbConn';
 import { SinglePost } from '../types/Post';
 import { User } from '../types/User';
@@ -80,6 +80,7 @@ const getDBValueString = (propName: string, propVal: string | number | boolean |
       valueString = new Date().toISOString();
       break;
     case 'is_markdown': // boolean
+      return `${propVal}::${getDBTypeString(propName)}`;
     case 'is_temp':
     case 'is_private':
       valueString = (propVal as boolean) ? 'true' : 'false';
@@ -215,7 +216,6 @@ router.get('/@:username/:url_slug/', async (req, response) => {
 
 const createPostQuery = async (postInfo: SinglePost) => {
   let newSlug = createUrlSlug(postInfo.title);
-  console.log(postInfo);
   const userName = postInfo.user.username;
   const result = await dbConn.query(
     `SELECT * FROM public."BLOG_POSTS" WHERE (fk_user_name='${userName}' AND url_slug='${newSlug}')`
@@ -225,14 +225,13 @@ const createPostQuery = async (postInfo: SinglePost) => {
     newSlug = `${newSlug}-${genSubSlug()}`;
   }
   // column name 스트링 생성 (validation 필요할 수도)
-  const targetColStr = ['id', ...Object.getOwnPropertyNames(postInfo), 'url_slug', 'released_at']
+  const targetColStr = [...Object.getOwnPropertyNames(postInfo), 'url_slug', 'released_at']
     .filter(prop => prop !== '')
     .map(colName => (colName === 'user' ? 'fk_user_name' : colName))
     .join(',');
 
   // column value 스트링 생성
   const newPostInfoStr = [
-    `'${v4()}'`,
     ...Object.values(postInfo).map(val => {
       if (typeof val === 'object') {
         return `'${val.username}'`;
@@ -249,7 +248,7 @@ const createPostQuery = async (postInfo: SinglePost) => {
   // 새로운 포스팅 생성 쿼리
   const insertQuery = `INSERT INTO public."BLOG_POSTS" (${targetColStr}) 
       VALUES (${newPostInfoStr}) 
-      returning id;`;
+      returning *;`;
 
   return insertQuery;
 };
@@ -282,13 +281,15 @@ const makeTempSaveQuery = async (postInfo: SinglePost) => {
   let dbQuery = '';
 
   if (result.rows.length === 0) {
+    const tempPostId = postInfo.temp_post_id;
     const tempTableResult = await dbConn.query(
-      `SELECT * FROM public."TEMP_POSTS" WHERE id='${postId}'`
+      `SELECT * FROM public."TEMP_POSTS" WHERE id='${tempPostId}'`
     );
+
     // 원본과 임시 포스트 둘 다 없는 경우
     const newSlug = createUrlSlug(postInfo.title);
-    // TEMP POST의 아이디는 새롭게 생성한다.
-    const newPostInfo: SinglePost = { ...postInfo, id: v4() };
+    // TEMP POST의 아이디는 request에서 넘어온 id로 한다
+    const newPostInfo: SinglePost = { ...postInfo, id: tempPostId };
     if (tempTableResult.rows.length === 0) {
       // column name 스트링 생성 (validation 필요할 수도)
       const targetColStr = [...Object.getOwnPropertyNames(newPostInfo), 'url_slug', 'released_at']
@@ -301,6 +302,8 @@ const makeTempSaveQuery = async (postInfo: SinglePost) => {
         ...Object.values(newPostInfo).map(val => {
           if (typeof val === 'object') {
             return `'${val.username}'`;
+          } else if (typeof val === 'boolean') {
+            return val;
           } else {
             return `'${val}'`;
           }
@@ -310,7 +313,6 @@ const makeTempSaveQuery = async (postInfo: SinglePost) => {
       ]
         .filter(prop => prop !== '')
         .join(',');
-
       // 새로운 포스팅 생성 쿼리
       dbQuery = `INSERT INTO public."TEMP_POSTS" (${targetColStr}) 
           VALUES (${newPostInfoStr}) 
@@ -323,7 +325,7 @@ const makeTempSaveQuery = async (postInfo: SinglePost) => {
         released_at: new Date().toISOString(),
       };
       const dbColNames = [...Object.getOwnPropertyNames(newPostInfo)]
-        .filter(prop => prop !== '')
+        .filter(prop => prop !== '' && prop !== 'id') // PK는 업데이트 안 됨
         .map(colName => getDBColName(colName));
       const valueAsignStr = dbColNames
         .filter((propName: string) =>
@@ -332,7 +334,7 @@ const makeTempSaveQuery = async (postInfo: SinglePost) => {
         .map(propName => `${propName} = ${getDBValueString(propName, newPostInfo[propName])}`)
         .join(',');
 
-      dbQuery = `UPDATE public."TEMP_POSTS" SET ${valueAsignStr} WHERE id = '${postId}' returning id;`;
+      dbQuery = `UPDATE public."TEMP_POSTS" SET ${valueAsignStr} WHERE id = '${tempPostId}' returning id;`;
     }
   } else if (postData.temp_post_id) {
     const valueAsignStr = [...Object.getOwnPropertyNames(postInfo), 'released_at']
@@ -375,16 +377,17 @@ const makeTempSaveQuery = async (postInfo: SinglePost) => {
 router.post('/write', async (req, response) => {
   const post = req.body;
   let query = '';
-  let successMessage = '';
 
   query = await createPostQuery(post);
-  successMessage = `Post ${post.id} created`;
 
   dbConn.query(query, (err, result) => {
     if (err) {
+      console.error(err.name, err.message);
+      console.error(query);
       return response.status(400).json(err);
     }
-    return response.status(201).json(successMessage);
+    const res = result.rows ? result.rows[0] : post;
+    return response.status(201).json(res);
   });
 });
 
@@ -392,12 +395,13 @@ router.post('/write', async (req, response) => {
 router.post('/write/tempsave', async (req, response) => {
   const postInfo = req.body;
   const query = await makeTempSaveQuery(postInfo);
-
   dbConn.query(query, (err, result) => {
     if (err) {
+      console.error(err.name, err.message);
+      console.error(query);
       return response.status(400).json(err);
     }
-    return response.status(201).json(result.rows[0].id);
+    return response.status(201).json(result);
   });
 });
 
