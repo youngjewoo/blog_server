@@ -3,3 +3,8 @@ node_modules/
 
 # test coverage
 src/coverage/
+
+# Local secrets (commit only the example)
+.env
+.env.*
+!.env.example
